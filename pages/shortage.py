@@ -52,12 +52,11 @@ if sel_supplier != "全部":
 if sel_buyer != "全部":
     df_view = df_view[df_view["采购"] == sel_buyer]
 
-# ── 主表格（固定显示核心列，其余折叠到右侧） ──────────────────────────────────
+# ── 主表格 ────────────────────────────────────────────────────────────────────
 CORE_COLS = ["序号", "子项物料编码", "子项物料名称", "子项物料规格",
              "应发数量", "工单欠料", "即时库存", "收料", "最终缺料",
              "交期", "供应商", "采购"]
 core_cols_exist = [c for c in CORE_COLS if c in df_view.columns]
-other_cols = [c for c in df_view.columns if c not in core_cols_exist]
 
 tab1, tab2 = st.tabs(["核心字段", "完整数据（含工单分解）"])
 
