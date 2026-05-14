@@ -6,14 +6,16 @@ BASE = Path(__file__).parent.parent
 
 st.markdown("""
 <style>
-[data-testid="stPageLink"] a {
+[data-testid="stPageLink"] a,
+[data-testid="stPageLink"] a * {
     background-color: #4D4D4D !important;
     color: #FFFFFF !important;
     font-weight: bold !important;
     border-radius: 6px;
     text-decoration: none;
 }
-[data-testid="stPageLink"] a:hover {
+[data-testid="stPageLink"] a:hover,
+[data-testid="stPageLink"] a:hover * {
     background-color: #333333 !important;
     color: #FFFFFF !important;
 }
