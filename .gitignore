@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.bas
+mrb_cache.json
+物料追踪表.xlsx
+generate_mrb_ppt*.py
+clear_mrb.py
+import_aging.py
+send_mail.py
+calc_mrb.py
+mrb_shortage.py
