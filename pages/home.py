@@ -4,7 +4,7 @@ from pathlib import Path
 
 BASE = Path(__file__).parent.parent
 
-st.title("生产数据看板")
+st.title("PMC数据看板")
 st.markdown("---")
 
 col1, col2 = st.columns(2, gap="large")

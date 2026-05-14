@@ -30,27 +30,44 @@ with col4:
 
 st.markdown("---")
 
-# ── 筛选栏 ────────────────────────────────────────────────────────────────────
-with st.expander("筛选条件", expanded=False):
-    fc1, fc2 = st.columns(2)
-    with fc1:
-        if "供应商" in df.columns:
-            suppliers_list = ["全部"] + sorted(df["供应商"].dropna().unique().tolist())
-            sel_supplier = st.selectbox("供应商", suppliers_list)
-        else:
-            sel_supplier = "全部"
-    with fc2:
-        if "采购" in df.columns:
-            buyers_list = ["全部"] + sorted(df["采购"].dropna().unique().tolist())
-            sel_buyer = st.selectbox("采购员", buyers_list)
-        else:
-            sel_buyer = "全部"
+# ── 动态筛选：所有列 ──────────────────────────────────────────────────────────
+CATEGORICAL_MAX = 30   # 唯一值 ≤ 此数视为分类列，用 multiselect
 
-df_view = df.copy()
-if sel_supplier != "全部":
-    df_view = df_view[df_view["供应商"] == sel_supplier]
-if sel_buyer != "全部":
-    df_view = df_view[df_view["采购"] == sel_buyer]
+with st.expander("筛选条件", expanded=True):
+    df_view = df.copy()
+    cols = list(df.columns)
+    # 每行放 4 个筛选控件
+    COLS_PER_ROW = 4
+    for row_start in range(0, len(cols), COLS_PER_ROW):
+        row_cols = cols[row_start: row_start + COLS_PER_ROW]
+        ui_cols = st.columns(len(row_cols))
+        for ui_col, col in zip(ui_cols, row_cols):
+            with ui_col:
+                series = df[col].dropna()
+                # 数值列 → 范围滑块
+                if pd.api.types.is_numeric_dtype(df[col]) and series.nunique() > 2:
+                    mn, mx = float(series.min()), float(series.max())
+                    if mn < mx:
+                        sel = st.slider(col, mn, mx, (mn, mx), key=f"f_{col}")
+                        df_view = df_view[
+                            (df_view[col].isna()) |
+                            ((df_view[col] >= sel[0]) & (df_view[col] <= sel[1]))
+                        ]
+                # 分类列（唯一值少）→ multiselect
+                elif series.nunique() <= CATEGORICAL_MAX:
+                    options = sorted(series.unique().tolist(), key=str)
+                    sel = st.multiselect(col, options, default=options, key=f"f_{col}")
+                    if sel:
+                        df_view = df_view[df_view[col].isin(sel) | df_view[col].isna()]
+                # 文本列（唯一值多）→ 关键字搜索
+                else:
+                    keyword = st.text_input(col, placeholder="关键字搜索", key=f"f_{col}")
+                    if keyword:
+                        df_view = df_view[
+                            df_view[col].astype(str).str.contains(keyword, case=False, na=False)
+                        ]
+
+st.caption(f"筛选后：{len(df_view)} / {len(df)} 条")
 
 # ── 主表格 ────────────────────────────────────────────────────────────────────
 CORE_COLS = ["序号", "子项物料编码", "子项物料名称", "子项物料规格",
