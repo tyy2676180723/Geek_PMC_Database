@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 import pandas as pd
 from pathlib import Path
@@ -14,57 +15,66 @@ if not data_path.exists():
 
 df = pd.read_excel(data_path, sheet_name=0)
 
+ASSEMBLY_RE = re.compile(r'^\d{2}\.\d{2}\.\d{5}$')
+assembly_cols = [c for c in df.columns if ASSEMBLY_RE.match(str(c))]
+normal_cols   = [c for c in df.columns if not ASSEMBLY_RE.match(str(c))]
+
 # ── 顶部指标 ──────────────────────────────────────────────────────────────────
-col1, col2, col3, col4 = st.columns(4)
-with col1:
+m1, m2, m3, m4 = st.columns(4)
+with m1:
     st.metric("缺料物料数", len(df))
-with col2:
-    total_shortage = df["最终缺料"].sum() if "最终缺料" in df.columns else 0
-    st.metric("缺料总数量", f"{total_shortage:,.0f}")
-with col3:
-    suppliers = df["供应商"].nunique() if "供应商" in df.columns else 0
-    st.metric("涉及供应商数", suppliers)
-with col4:
-    buyers = df["采购"].nunique() if "采购" in df.columns else 0
-    st.metric("涉及采购员数", buyers)
+with m2:
+    total = df["最终缺料"].sum() if "最终缺料" in df.columns else 0
+    st.metric("缺料总数量", f"{total:,.0f}")
+with m3:
+    st.metric("涉及供应商数", df["供应商"].nunique() if "供应商" in df.columns else "—")
+with m4:
+    st.metric("涉及采购员数", df["采购"].nunique() if "采购" in df.columns else "—")
 
 st.markdown("---")
 
-# ── 动态筛选：所有列 ──────────────────────────────────────────────────────────
-CATEGORICAL_MAX = 30   # 唯一值 ≤ 此数视为分类列，用 multiselect
+# ── 动态筛选 ──────────────────────────────────────────────────────────────────
+COLS_PER_ROW  = 4
+MULTISEL_MAX  = 50   # 唯一值超过此数改用关键字搜索
 
 with st.expander("筛选条件", expanded=True):
     df_view = df.copy()
-    cols = list(df.columns)
-    # 每行放 4 个筛选控件
-    COLS_PER_ROW = 4
-    for row_start in range(0, len(cols), COLS_PER_ROW):
-        row_cols = cols[row_start: row_start + COLS_PER_ROW]
-        ui_cols = st.columns(len(row_cols))
+
+    # 1. 成品料号筛选（所有 ##.##.##### 列合并为一个多选）
+    if assembly_cols:
+        st.markdown("**成品料号**")
+        sel_asm = st.multiselect(
+            "成品料号",
+            options=assembly_cols,
+            default=[],
+            label_visibility="collapsed",
+            key="f_assembly"
+        )
+        if sel_asm:
+            mask = pd.Series(False, index=df_view.index)
+            for c in sel_asm:
+                mask |= (df_view[c].notna() & (df_view[c] != 0))
+            df_view = df_view[mask]
+        st.markdown("---")
+
+    # 2. 其余列：多选 or 关键字搜索（无滑块）
+    for row_start in range(0, len(normal_cols), COLS_PER_ROW):
+        row_cols = normal_cols[row_start: row_start + COLS_PER_ROW]
+        ui_cols  = st.columns(len(row_cols))
         for ui_col, col in zip(ui_cols, row_cols):
             with ui_col:
-                series = df[col].dropna()
-                # 数值列 → 范围滑块
-                if pd.api.types.is_numeric_dtype(df[col]) and series.nunique() > 2:
-                    mn, mx = float(series.min()), float(series.max())
-                    if mn < mx:
-                        sel = st.slider(col, mn, mx, (mn, mx), key=f"f_{col}")
-                        df_view = df_view[
-                            (df_view[col].isna()) |
-                            ((df_view[col] >= sel[0]) & (df_view[col] <= sel[1]))
-                        ]
-                # 分类列（唯一值少）→ multiselect
-                elif series.nunique() <= CATEGORICAL_MAX:
+                series  = df[col].dropna()
+                n_uniq  = series.nunique()
+                if n_uniq <= MULTISEL_MAX:
                     options = sorted(series.unique().tolist(), key=str)
                     sel = st.multiselect(col, options, default=options, key=f"f_{col}")
-                    if sel:
+                    if len(sel) < len(options):
                         df_view = df_view[df_view[col].isin(sel) | df_view[col].isna()]
-                # 文本列（唯一值多）→ 关键字搜索
                 else:
-                    keyword = st.text_input(col, placeholder="关键字搜索", key=f"f_{col}")
-                    if keyword:
+                    kw = st.text_input(col, placeholder="关键字搜索", key=f"f_{col}")
+                    if kw:
                         df_view = df_view[
-                            df_view[col].astype(str).str.contains(keyword, case=False, na=False)
+                            df_view[col].astype(str).str.contains(kw, case=False, na=False)
                         ]
 
 st.caption(f"筛选后：{len(df_view)} / {len(df)} 条")
