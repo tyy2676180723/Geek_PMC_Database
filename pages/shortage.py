@@ -40,7 +40,7 @@ MULTISEL_MAX  = 50   # 唯一值超过此数改用关键字搜索
 with st.expander("筛选条件", expanded=True):
     df_view = df.copy()
 
-    # 1. 成品料号筛选（所有 ##.##.##### 列合并为一个多选）
+    # 1. 成品料号筛选（默认展示）
     if assembly_cols:
         st.markdown("**成品料号**")
         sel_asm = st.multiselect(
@@ -55,27 +55,29 @@ with st.expander("筛选条件", expanded=True):
             for c in sel_asm:
                 mask |= (df_view[c].notna() & (df_view[c] != 0))
             df_view = df_view[mask]
-        st.markdown("---")
 
-    # 2. 其余列：多选 or 关键字搜索（无滑块）
-    for row_start in range(0, len(normal_cols), COLS_PER_ROW):
-        row_cols = normal_cols[row_start: row_start + COLS_PER_ROW]
-        ui_cols  = st.columns(len(row_cols))
-        for ui_col, col in zip(ui_cols, row_cols):
-            with ui_col:
-                series  = df[col].dropna()
-                n_uniq  = series.nunique()
-                if n_uniq <= MULTISEL_MAX:
-                    options = sorted(series.unique().tolist(), key=str)
-                    sel = st.multiselect(col, options, default=options, key=f"f_{col}")
-                    if len(sel) < len(options):
-                        df_view = df_view[df_view[col].isin(sel) | df_view[col].isna()]
-                else:
-                    kw = st.text_input(col, placeholder="关键字搜索", key=f"f_{col}")
-                    if kw:
-                        df_view = df_view[
-                            df_view[col].astype(str).str.contains(kw, case=False, na=False)
-                        ]
+    st.markdown("---")
+
+    # 2. 其余列：默认折叠
+    with st.expander("更多筛选条件", expanded=False):
+        for row_start in range(0, len(normal_cols), COLS_PER_ROW):
+            row_cols = normal_cols[row_start: row_start + COLS_PER_ROW]
+            ui_cols  = st.columns(len(row_cols))
+            for ui_col, col in zip(ui_cols, row_cols):
+                with ui_col:
+                    series  = df[col].dropna()
+                    n_uniq  = series.nunique()
+                    if n_uniq <= MULTISEL_MAX:
+                        options = sorted(series.unique().tolist(), key=str)
+                        sel = st.multiselect(col, options, default=options, key=f"f_{col}")
+                        if len(sel) < len(options):
+                            df_view = df_view[df_view[col].isin(sel) | df_view[col].isna()]
+                    else:
+                        kw = st.text_input(col, placeholder="关键字搜索", key=f"f_{col}")
+                        if kw:
+                            df_view = df_view[
+                                df_view[col].astype(str).str.contains(kw, case=False, na=False)
+                            ]
 
 st.caption(f"筛选后：{len(df_view)} / {len(df)} 条")
 
