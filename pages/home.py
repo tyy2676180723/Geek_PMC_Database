@@ -4,7 +4,23 @@ from pathlib import Path
 
 BASE = Path(__file__).parent.parent
 
-st.title("PMC数据看板")
+st.markdown("""
+<style>
+[data-testid="stPageLink"] a {
+    background-color: #4D4D4D !important;
+    color: #FFFFFF !important;
+    font-weight: bold !important;
+    border-radius: 6px;
+    text-decoration: none;
+}
+[data-testid="stPageLink"] a:hover {
+    background-color: #333333 !important;
+    color: #FFFFFF !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.title("PMC智能助手")
 st.markdown("---")
 
 col1, col2 = st.columns(2, gap="large")
