@@ -3,7 +3,6 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 
-st.set_page_config(page_title="待开工单缺料看板", layout="wide")
 st.title("待开工单缺料看板")
 
 BASE = Path(__file__).parent.parent
