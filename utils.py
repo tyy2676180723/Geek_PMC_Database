@@ -59,13 +59,14 @@ _DEFAULT_H = 540   # 固定高度，比500多40px，保证末行不被遮挡
 # scroll / resize 时重新同步宽度和位置
 _ON_READY_JS = JsCode("""
 function(params) {
-    // ── 列宽：先自适应，完成后再检查，超过 200px 才压回 200px ──
+    // ── 列宽：自适应后夹在 [80, 200] px；手动拖拽不受限 ────────
     params.columnApi.autoSizeAllColumns();
     setTimeout(function() {
-        var MAX_W = 200;
+        var MIN_W = 80, MAX_W = 200;
         params.columnApi.getAllColumns().forEach(function(col) {
-            if (col.getActualWidth() > MAX_W)
-                params.columnApi.setColumnWidth(col.getColId(), MAX_W);
+            var w = col.getActualWidth();
+            if      (w < MIN_W) params.columnApi.setColumnWidth(col.getColId(), MIN_W);
+            else if (w > MAX_W) params.columnApi.setColumnWidth(col.getColId(), MAX_W);
         });
     }, 300);
 
