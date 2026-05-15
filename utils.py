@@ -61,20 +61,29 @@ _ON_READY_JS = JsCode("""
 function(params) {
     var grid = document.querySelector('.ag-root-wrapper');
 
-    // Force horizontal scrollbar to always occupy layout space so the flex row
-    // area is sized correctly and the last row is never hidden underneath it.
-    var st = document.getElementById('__ag_hscroll__');
+    // Inject CSS: keep scrollbar in flex layout (17px) and make it always visible
+    var st = document.getElementById('__ag_fix__');
     if (!st) {
         st = document.createElement('style');
-        st.id = '__ag_hscroll__';
+        st.id = '__ag_fix__';
         document.head.appendChild(st);
     }
-    st.textContent =
-        '.ag-body-horizontal-scroll { display: block !important; min-height: 17px !important; }' +
-        '.ag-body-horizontal-scroll-viewport { min-height: 17px !important; overflow-x: scroll !important; }';
+    st.textContent = [
+        '.ag-body-horizontal-scroll { display: block !important; min-height: 17px !important; }',
+        '.ag-body-horizontal-scroll-viewport { min-height: 17px !important; overflow-x: scroll !important; }',
+        '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar { height: 8px !important; display: block !important; }',
+        '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-track { background: #e0e0e0 !important; }',
+        '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-thumb { background: #999 !important; border-radius: 4px !important; min-width: 30px !important; }'
+    ].join(' ');
+
+    // After injecting CSS, dispatch resize so AG Grid recalculates viewportHeight
+    // and maxScrollY — without this the last row is unreachable by mouse scroll.
+    setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 50);
 
     function autoSize() {
         params.columnApi.autoSizeAllColumns();
+        // Recalculate again after columns are resized
+        setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 80);
     }
 
     if (grid && 'IntersectionObserver' in window) {
