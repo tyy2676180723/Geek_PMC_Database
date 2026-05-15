@@ -5,6 +5,7 @@ st.set_page_config(page_title="PMC智能助手", layout="wide")
 st.markdown("""
 <style>
 [data-testid="stSidebar"] { min-width: 225px; max-width: 225px; }
+.block-container { padding-top: 1.5rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
