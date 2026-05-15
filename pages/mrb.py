@@ -1,6 +1,6 @@
 import json
 import subprocess
-from datetime import date
+from datetime import date, datetime
 
 import streamlit as st
 import pandas as pd
@@ -79,6 +79,17 @@ def merge_progress(df: pd.DataFrame, sheet_name: str, prog: dict):
     return df, key_col
 
 
+def _show_save_status(key: str):
+    """展示上次保存的推送状态（持久显示，不随重渲染消失）。"""
+    info = st.session_state.get(key)
+    if info:
+        ts = info["time"]
+        if info["ok"]:
+            st.success(f"✅ 已保存并推送到 GitHub（{ts}）", icon=None)
+        else:
+            st.warning(f"⚠️ 已本地保存，GitHub 推送失败（{ts}）—— 请检查 Streamlit Cloud Secrets 中的 GITHUB_TOKEN")
+
+
 tab1, tab2, tab3 = st.tabs(["📈 趋势图", "📦 MRB库存", "⚠️ MRB缺料"])
 
 with tab1:
@@ -118,10 +129,12 @@ with tab3:
             edited_a = editable_table(df_a, ["处理进度"], key="shortage_a")
             if st.button("💾 保存处理进度", key="save_a", type="primary"):
                 prog[sname] = dict(zip(edited_a[key_a].astype(str), edited_a["处理进度"]))
-                if save_progress(prog):
-                    st.success("已保存并推送到 GitHub")
-                else:
-                    st.warning("已本地保存，但推送失败。请在 Streamlit Cloud Secrets 中添加 GITHUB_TOKEN。")
+                ok = save_progress(prog)
+                st.session_state["save_status_a"] = {
+                    "ok": ok,
+                    "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+            _show_save_status("save_status_a")
 
         with sub_b:
             sname2 = xls2.sheet_names[1]
@@ -130,9 +143,11 @@ with tab3:
             edited_b = editable_table(df_b, ["处理进度"], key="shortage_b")
             if st.button("💾 保存处理进度", key="save_b", type="primary"):
                 prog[sname2] = dict(zip(edited_b[key_b].astype(str), edited_b["处理进度"]))
-                if save_progress(prog):
-                    st.success("已保存并推送到 GitHub")
-                else:
-                    st.warning("已本地保存，但推送失败。请在 Streamlit Cloud Secrets 中添加 GITHUB_TOKEN。")
+                ok = save_progress(prog)
+                st.session_state["save_status_b"] = {
+                    "ok": ok,
+                    "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+            _show_save_status("save_status_b")
     else:
         st.warning("未找到 MRB缺料.xlsx")
