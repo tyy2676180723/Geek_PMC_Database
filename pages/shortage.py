@@ -86,12 +86,15 @@ CORE_COLS = ["序号", "子项物料编码", "子项物料名称", "子项物料
              "交期", "供应商", "采购"]
 core_cols_exist = [c for c in CORE_COLS if c in df_view.columns]
 
+# key 随过滤结果变化，避免 AgGrid 复用缓存旧数据
+_vk = abs(hash(tuple(df_view.index.tolist())))
+
 tab1, tab2 = st.tabs(["核心字段", "完整数据（含工单分解）"])
 
 with tab1:
     edited_df = editable_table(
         df_view[core_cols_exist], ["交期"],
-        height=500, key="editor_core"
+        height=500, key=f"editor_core_{_vk}"
     )
 
     if st.button("💾 保存交期修改", type="primary"):
@@ -123,7 +126,7 @@ with tab1:
 with tab2:
     edited_full = editable_table(
         df_view, ["交期"],
-        height=500, key="editor_full"
+        height=500, key=f"editor_full_{_vk}"
     )
 
     if st.button("💾 保存交期修改", type="primary", key="save_full"):
