@@ -59,24 +59,54 @@ _DEFAULT_H = 540
 # 等价于手动点击列菜单的"所有列自适应"，但自动触发
 _ON_READY_JS = JsCode("""
 function(params) {
-    function autoSize() {
+    var grid = document.querySelector('.ag-root-wrapper');
+
+    function autoSizeAndSync() {
         params.columnApi.autoSizeAllColumns();
+        var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
+        var viewport = document.querySelector('.ag-body-viewport');
+        if (hScroll && viewport) {
+            var r = viewport.getBoundingClientRect();
+            hScroll.style.left  = r.left  + 'px';
+            hScroll.style.width = r.width + 'px';
+        }
     }
 
-    var grid = document.querySelector('.ag-root-wrapper');
     if (grid && 'IntersectionObserver' in window) {
         var observer = new IntersectionObserver(function(entries) {
             entries.forEach(function(entry) {
                 if (entry.isIntersecting) {
-                    setTimeout(autoSize, 100);
+                    setTimeout(autoSizeAndSync, 100);
                     observer.disconnect();
                 }
             });
         }, { threshold: 0.1 });
         observer.observe(grid);
     } else {
-        setTimeout(autoSize, 600);
+        setTimeout(autoSizeAndSync, 600);
     }
+
+    // 横向滚动条固定到屏幕底部
+    var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
+    var viewport = document.querySelector('.ag-body-viewport');
+    if (!hScroll || !viewport) return;
+
+    hScroll.style.position   = 'fixed';
+    hScroll.style.bottom     = '0px';
+    hScroll.style.zIndex     = '1000';
+    hScroll.style.background = '#f0f2f6';
+    hScroll.style.borderTop  = '1px solid #d0d0d0';
+
+    function syncPos() {
+        var r = viewport.getBoundingClientRect();
+        hScroll.style.left  = r.left  + 'px';
+        hScroll.style.width = r.width + 'px';
+    }
+    syncPos();
+    window.addEventListener('resize', syncPos);
+    window.addEventListener('scroll', syncPos);
+
+    viewport.style.paddingBottom = (hScroll.offsetHeight || 20) + 'px';
 }
 """)
 
