@@ -60,23 +60,42 @@ _ON_READY_JS = JsCode("""
 function(params) {
     var grid = document.querySelector('.ag-root-wrapper');
 
-    // Force horizontal scrollbar to always be visible with custom webkit styling
-    var st = document.getElementById('__ag_fix__');
-    if (!st) {
-        st = document.createElement('style');
-        st.id = '__ag_fix__';
-        document.head.appendChild(st);
+    function applyScrollbarFix() {
+        // Give the scrollbar container a visible background so it always shows
+        var hScroll = document.querySelector('.ag-body-horizontal-scroll');
+        if (hScroll) {
+            hScroll.style.setProperty('display', 'block', 'important');
+            hScroll.style.setProperty('visibility', 'visible', 'important');
+            hScroll.style.setProperty('background', '#f0f2f6', 'important');
+            hScroll.style.setProperty('border-top', '1px solid #d0d0d0', 'important');
+        }
+        // Force native overflow-x: scroll so the browser renders the scrollbar
+        var hVp = document.querySelector('.ag-body-horizontal-scroll-viewport');
+        if (hVp) {
+            hVp.style.setProperty('overflow-x', 'scroll', 'important');
+        }
+        // Webkit scrollbar styling
+        var st = document.getElementById('__ag_fix__');
+        if (!st) {
+            st = document.createElement('style');
+            st.id = '__ag_fix__';
+            document.head.appendChild(st);
+        }
+        st.textContent = [
+            '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar { height: 8px !important; display: block !important; }',
+            '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-track { background: #e0e0e0 !important; }',
+            '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-thumb { background: #999 !important; border-radius: 4px !important; min-width: 30px !important; }'
+        ].join(' ');
     }
-    st.textContent = [
-        '.ag-body-horizontal-scroll-viewport { overflow-x: scroll !important; }',
-        '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar { height: 8px !important; display: block !important; }',
-        '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-track { background: #e0e0e0 !important; }',
-        '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-thumb { background: #999 !important; border-radius: 4px !important; min-width: 30px !important; }'
-    ].join(' ');
 
     function autoSize() {
         params.columnApi.autoSizeAllColumns();
+        setTimeout(applyScrollbarFix, 100);
     }
+
+    // Apply immediately and again after render settles
+    applyScrollbarFix();
+    setTimeout(applyScrollbarFix, 400);
 
     if (grid && 'IntersectionObserver' in window) {
         var observer = new IntersectionObserver(function(entries) {
@@ -98,7 +117,7 @@ function(params) {
 # 确保最后一行数据可以完整滚动到可视区域（绕开 AG Grid maxScrollY 计算偏差）
 _PINNED_ROW_HEIGHT_JS = JsCode("""
 function(params) {
-    if (params.node.rowPinned === 'bottom') return 5;
+    if (params.node.rowPinned === 'bottom') return 10;
     return null;
 }
 """)
