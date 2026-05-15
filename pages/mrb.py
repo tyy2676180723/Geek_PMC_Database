@@ -5,11 +5,59 @@ from datetime import date
 import streamlit as st
 import pandas as pd
 from pathlib import Path
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 st.title("MRB 看板")
 
 BASE = Path(__file__).parent.parent
 PROGRESS_FILE = BASE / "mrb_progress.json"
+
+LOCALE_ZH = {
+    "sortAscending": "升序",
+    "sortDescending": "降序",
+    "noSort": "不排序",
+    "autosizeThisColumn": "自适应列宽",
+    "autosizeAllColumns": "所有列自适应",
+    "pinColumn": "固定列",
+    "pinLeft": "固定到左侧",
+    "pinRight": "固定到右侧",
+    "noPin": "取消固定",
+    "hideColumn": "隐藏列",
+    "chooseColumns": "选择列",
+    "resetColumns": "重置列",
+    "export": "导出",
+    "csvExport": "导出 CSV",
+    "excelExport": "导出 Excel",
+    "filterOoo": "筛选...",
+    "equals": "等于",
+    "notEqual": "不等于",
+    "lessThan": "小于",
+    "greaterThan": "大于",
+    "lessThanOrEqual": "小于等于",
+    "greaterThanOrEqual": "大于等于",
+    "contains": "包含",
+    "notContains": "不包含",
+    "startsWith": "开头为",
+    "endsWith": "结尾为",
+    "blank": "空",
+    "notBlank": "非空",
+    "andCondition": "且",
+    "orCondition": "或",
+    "clearFilter": "清除",
+    "applyFilter": "应用",
+    "noRowsToShow": "暂无数据",
+    "loadingOoo": "加载中...",
+    "columns": "列",
+    "filters": "筛选",
+    "page": "页",
+    "of": "/",
+    "to": "-",
+    "more": "更多",
+    "next": "下一页",
+    "last": "末页",
+    "first": "首页",
+    "previous": "上一页",
+}
 
 
 def load_progress() -> dict:
@@ -30,8 +78,7 @@ def save_progress(prog: dict):
         subprocess.run(["git", "push"], cwd=str(BASE), capture_output=True)
 
 
-def merge_progress(df: pd.DataFrame, sheet_name: str, prog: dict) -> pd.DataFrame:
-    """将已保存的处理进度合并到 df，若无「处理进度」列则新增。"""
+def merge_progress(df: pd.DataFrame, sheet_name: str, prog: dict):
     key_col = "物料编码" if "物料编码" in df.columns else df.columns[0]
     mapping = prog.get(sheet_name, {})
     df = df.copy()
@@ -40,15 +87,25 @@ def merge_progress(df: pd.DataFrame, sheet_name: str, prog: dict) -> pd.DataFram
 
 
 def shortage_editor(df_raw: pd.DataFrame, sheet_name: str, prog: dict, editor_key: str):
-    """渲染可编辑的缺料表，返回 (edited_df, key_col)。"""
     df, key_col = merge_progress(df_raw, sheet_name, prog)
 
-    # 所有列禁用，仅「处理进度」可编辑
-    col_cfg = {c: st.column_config.Column(disabled=True) for c in df.columns if c != "处理进度"}
-    col_cfg["处理进度"] = st.column_config.TextColumn("处理进度", help="可直接编辑，点击保存后生效")
+    gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_default_column(editable=False, resizable=True, sortable=True, filter=True)
+    gb.configure_column("处理进度", editable=True,
+                        cellStyle={"backgroundColor": "#fffde7"})
+    go = gb.build()
+    go["localeText"] = LOCALE_ZH
 
-    edited = st.data_editor(df, column_config=col_cfg, use_container_width=True, height=400, key=editor_key)
-    return edited, key_col
+    result = AgGrid(
+        df,
+        gridOptions=go,
+        update_mode=GridUpdateMode.VALUE_CHANGED,
+        height=400,
+        use_container_width=True,
+        key=editor_key,
+    )
+    edited_df = pd.DataFrame(result["data"])
+    return edited_df, key_col
 
 
 tab1, tab2, tab3 = st.tabs(["📈 趋势图", "📦 MRB库存", "⚠️ MRB缺料"])
