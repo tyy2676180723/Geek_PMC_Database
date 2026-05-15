@@ -137,7 +137,7 @@ function(params) {
 # 确保最后一行数据在 position:fixed 横向滚动条之上完整显示
 _PINNED_ROW_HEIGHT_JS = JsCode("""
 function(params) {
-    if (params.node.rowPinned === 'bottom') return 29;
+    if (params.node.rowPinned === 'bottom') return 28;
     return null;
 }
 """)
