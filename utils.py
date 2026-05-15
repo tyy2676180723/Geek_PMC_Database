@@ -106,6 +106,15 @@ function(params) {
     window.addEventListener('resize', syncPos);
     window.addEventListener('scroll', syncPos);
 
+    // 用 CSS 隐藏幽灵钉住行（getRowStyle 对 pinned 行不生效）
+    var st = document.getElementById('__ag_ghost__');
+    if (!st) {
+        st = document.createElement('style');
+        st.id = '__ag_ghost__';
+        document.head.appendChild(st);
+    }
+    st.textContent = '.ag-floating-bottom { opacity: 0 !important; pointer-events: none !important; }';
+
     // 用注入 <style> + !important 防止 AG Grid 内部样式覆盖 paddingBottom
     function applyPaddingFix() {
         var h = hScroll.offsetHeight;
@@ -124,21 +133,12 @@ function(params) {
 }
 """)
 
-# 13px 幽灵钉住行：不参与排序/筛选，作为底部缓冲，
+# 32px 幽灵钉住行：不参与排序/筛选，作为底部缓冲，
 # 确保最后一行数据在 position:fixed 横向滚动条之上完整显示
 _PINNED_ROW_HEIGHT_JS = JsCode("""
 function(params) {
-    if (params.node.rowPinned === 'bottom') return 27;
+    if (params.node.rowPinned === 'bottom') return 32;
     return null;
-}
-""")
-
-# 幽灵行完全透明且不可交互，仅作占位
-_PINNED_ROW_STYLE_JS = JsCode("""
-function(params) {
-    if (params.node.rowPinned === 'bottom') {
-        return { opacity: '0', pointerEvents: 'none', border: 'none' };
-    }
 }
 """)
 
@@ -160,7 +160,6 @@ def _build_go(gb: GridOptionsBuilder) -> dict:
     go["onFirstDataRendered"] = _ON_READY_JS
     go["pinnedBottomRowData"] = [{}]
     go["getRowHeight"] = _PINNED_ROW_HEIGHT_JS
-    go["getRowStyle"] = _PINNED_ROW_STYLE_JS
     return go
 
 
