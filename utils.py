@@ -2,7 +2,7 @@
 共享工具模块：AgGrid 中文表格
 新建看板时 import 本模块，调用 show_table / editable_table 即可。
 """
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode, ColumnsAutoSizeMode
 import pandas as pd
 
 LOCALE_ZH = {
@@ -55,22 +55,18 @@ LOCALE_ZH = {
 
 _DEFAULT_H = 540
 
-# suppressColumnVirtualisation 强制渲染全部列（非虚拟化），
-# autoSizeAllColumns 在 500ms 后执行，确保所有单元格已渲染
+# FIT_CONTENTS 完成后（1000ms），把仍然过窄的列补到 80px
+# 横向滚动条 position:fixed 固定在屏幕底部
 _ON_READY_JS = JsCode("""
 function(params) {
+    // FIT_CONTENTS 自适应完成后补下限
     setTimeout(function() {
-        params.columnApi.autoSizeAllColumns();
-
-        // 自适应完成后重新同步横向滚动条宽度
-        var viewport = document.querySelector('.ag-body-viewport');
-        var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
-        if (viewport && hScroll) {
-            var r = viewport.getBoundingClientRect();
-            hScroll.style.left  = r.left  + 'px';
-            hScroll.style.width = r.width + 'px';
-        }
-    }, 500);
+        var MIN_W = 80;
+        params.columnApi.getAllColumns().forEach(function(col) {
+            if (col.getActualWidth() < MIN_W)
+                params.columnApi.setColumnWidth(col.getColId(), MIN_W);
+        });
+    }, 1000);
 
     // 横向滚动条固定到屏幕底部
     var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
@@ -102,7 +98,6 @@ _GRID_BASE = dict(
     alwaysShowHorizontalScroll=True,
     suppressHorizontalScroll=False,
     domLayout="normal",
-    suppressColumnVirtualisation=True,  # 强制渲染所有列，确保 autoSize 准确
 )
 
 
@@ -115,19 +110,20 @@ def _build_go(gb: GridOptionsBuilder) -> dict:
 
 
 def show_table(df: pd.DataFrame, height: int = None, key: str = None) -> None:
-    """只读表格：列菜单中文，固定高度竖向滚动，列宽自适应，横向滚动条固定在屏幕底部。"""
+    """只读表格：列菜单中文，FIT_CONTENTS 自适应，固定高度竖向滚动，横向滚动条固定在屏幕底部。"""
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(resizable=True, sortable=True, filter=True)
     go = _build_go(gb)
     AgGrid(df, gridOptions=go, height=height or _DEFAULT_H,
-           use_container_width=True, fit_columns_on_grid_load=False,
+           use_container_width=True,
+           columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
            allow_unsafe_jscode=True, key=key)
 
 
 def editable_table(df: pd.DataFrame, editable_cols: list[str],
                    height: int = None, key: str = None) -> pd.DataFrame:
     """
-    可编辑表格：列菜单中文，固定高度竖向滚动，列宽自适应，横向滚动条固定在屏幕底部。
+    可编辑表格：列菜单中文，FIT_CONTENTS 自适应，固定高度竖向滚动，横向滚动条固定在屏幕底部。
     editable_cols：允许编辑的列名列表，其余列只读（黄色背景区分）。
     返回编辑后的 DataFrame。
     """
@@ -142,6 +138,7 @@ def editable_table(df: pd.DataFrame, editable_cols: list[str],
     result = AgGrid(df, gridOptions=go,
                     update_mode=GridUpdateMode.VALUE_CHANGED,
                     height=height or _DEFAULT_H,
-                    use_container_width=True, fit_columns_on_grid_load=False,
+                    use_container_width=True,
+                    columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
                     allow_unsafe_jscode=True, key=key)
     return pd.DataFrame(result["data"])
