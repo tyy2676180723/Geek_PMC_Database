@@ -56,76 +56,65 @@ LOCALE_ZH = {
 _DEFAULT_H = 540
 
 # 用 IntersectionObserver 监听 grid 真正可见后再自适应列宽
-# 等价于手动点击列菜单的"所有列自适应"，但自动触发
 _ON_READY_JS = JsCode("""
 function(params) {
     var grid = document.querySelector('.ag-root-wrapper');
 
-    function autoSizeAndSync() {
-        params.columnApi.autoSizeAllColumns();
-        var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
-        var viewport = document.querySelector('.ag-body-viewport');
-        if (hScroll && viewport) {
-            var r = viewport.getBoundingClientRect();
-            hScroll.style.left  = r.left  + 'px';
-            hScroll.style.width = r.width + 'px';
+    function applyScrollbarFix() {
+        // Give the scrollbar container a visible background so it always shows
+        var hScroll = document.querySelector('.ag-body-horizontal-scroll');
+        if (hScroll) {
+            hScroll.style.setProperty('display', 'block', 'important');
+            hScroll.style.setProperty('visibility', 'visible', 'important');
+            hScroll.style.setProperty('background', '#f0f2f6', 'important');
+            hScroll.style.setProperty('border-top', '1px solid #d0d0d0', 'important');
         }
+        // Force native overflow-x: scroll so the browser renders the scrollbar
+        var hVp = document.querySelector('.ag-body-horizontal-scroll-viewport');
+        if (hVp) {
+            hVp.style.setProperty('overflow-x', 'scroll', 'important');
+        }
+        // Webkit scrollbar styling
+        var st = document.getElementById('__ag_fix__');
+        if (!st) {
+            st = document.createElement('style');
+            st.id = '__ag_fix__';
+            document.head.appendChild(st);
+        }
+        st.textContent = [
+            '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar { height: 8px !important; display: block !important; }',
+            '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-track { background: #e0e0e0 !important; }',
+            '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-thumb { background: #999 !important; border-radius: 4px !important; min-width: 30px !important; }'
+        ].join(' ');
     }
+
+    function autoSize() {
+        params.columnApi.autoSizeAllColumns();
+        setTimeout(applyScrollbarFix, 100);
+    }
+
+    // Apply immediately and again after render settles
+    applyScrollbarFix();
+    setTimeout(applyScrollbarFix, 400);
 
     if (grid && 'IntersectionObserver' in window) {
         var observer = new IntersectionObserver(function(entries) {
             entries.forEach(function(entry) {
                 if (entry.isIntersecting) {
-                    setTimeout(autoSizeAndSync, 100);
+                    setTimeout(autoSize, 100);
                     observer.disconnect();
                 }
             });
         }, { threshold: 0.1 });
         observer.observe(grid);
     } else {
-        setTimeout(autoSizeAndSync, 600);
+        setTimeout(autoSize, 600);
     }
-
-    // 横向滚动条固定到屏幕底部
-    var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
-    var viewport = document.querySelector('.ag-body-viewport');
-    if (!hScroll || !viewport) return;
-
-    hScroll.style.position   = 'fixed';
-    hScroll.style.bottom     = '0px';
-    hScroll.style.zIndex     = '1000';
-    hScroll.style.background = '#f0f2f6';
-    hScroll.style.borderTop  = '1px solid #d0d0d0';
-
-    function syncPos() {
-        var r = viewport.getBoundingClientRect();
-        hScroll.style.left  = r.left  + 'px';
-        hScroll.style.width = r.width + 'px';
-    }
-    syncPos();
-    window.addEventListener('resize', syncPos);
-    window.addEventListener('scroll', syncPos);
-
-    // 用注入 <style> + !important 防止 AG Grid 内部样式覆盖 paddingBottom
-    function applyPaddingFix() {
-        var h = hScroll.offsetHeight;
-        if (!h || h < 5) h = 20;
-        var st = document.getElementById('__ag_pb_fix__');
-        if (!st) {
-            st = document.createElement('style');
-            st.id = '__ag_pb_fix__';
-            document.head.appendChild(st);
-        }
-        st.textContent = '.ag-body-viewport { padding-bottom: ' + h + 'px !important; }';
-    }
-    applyPaddingFix();
-    // 延迟再执行一次，确保 offsetHeight 在完整渲染后准确
-    setTimeout(applyPaddingFix, 300);
 }
 """)
 
-# 13px 幽灵钉住行：不参与排序/筛选，作为底部缓冲，
-# 确保最后一行数据在 position:fixed 横向滚动条之上完整显示
+# 5px 幽灵钉住行：不参与排序/筛选，只作为底部缓冲，
+# 确保最后一行数据可以完整滚动到可视区域（绕开 AG Grid maxScrollY 计算偏差）
 _PINNED_ROW_HEIGHT_JS = JsCode("""
 function(params) {
     if (params.node.rowPinned === 'bottom') return 13;
@@ -155,7 +144,7 @@ def _build_go(gb: GridOptionsBuilder) -> dict:
 
 
 def show_table(df: pd.DataFrame, height: int = None, key: str = None) -> None:
-    """只读表格：列菜单中文，FIT_CONTENTS 自适应，固定高度竖向滚动，横向滚动条固定在屏幕底部。"""
+    """只读表格：列菜单中文，FIT_CONTENTS 自适应，固定高度竖向滚动，横向滚动条始终可见。"""
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(resizable=True, sortable=True, filter=True)
     go = _build_go(gb)
@@ -168,7 +157,7 @@ def show_table(df: pd.DataFrame, height: int = None, key: str = None) -> None:
 def editable_table(df: pd.DataFrame, editable_cols: list[str],
                    height: int = None, key: str = None) -> pd.DataFrame:
     """
-    可编辑表格：列菜单中文，FIT_CONTENTS 自适应，固定高度竖向滚动，横向滚动条固定在屏幕底部。
+    可编辑表格：列菜单中文，FIT_CONTENTS 自适应，固定高度竖向滚动，横向滚动条始终可见。
     editable_cols：允许编辑的列名列表，其余列只读（黄色背景区分）。
     返回编辑后的 DataFrame（不含底部幽灵行）。
     """

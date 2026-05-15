@@ -124,15 +124,6 @@ function(params) {
 }
 """)
 
-# 13px 幽灵钉住行：不参与排序/筛选，作为底部缓冲，
-# 确保最后一行数据在 position:fixed 横向滚动条之上完整显示
-_PINNED_ROW_HEIGHT_JS = JsCode("""
-function(params) {
-    if (params.node.rowPinned === 'bottom') return 13;
-    return null;
-}
-""")
-
 _GRID_BASE = dict(
     enableSorting=True,
     enableFilter=True,
@@ -149,8 +140,6 @@ def _build_go(gb: GridOptionsBuilder) -> dict:
     go = gb.build()
     go["localeText"] = LOCALE_ZH
     go["onFirstDataRendered"] = _ON_READY_JS
-    go["pinnedBottomRowData"] = [{}]
-    go["getRowHeight"] = _PINNED_ROW_HEIGHT_JS
     return go
 
 
@@ -170,7 +159,7 @@ def editable_table(df: pd.DataFrame, editable_cols: list[str],
     """
     可编辑表格：列菜单中文，FIT_CONTENTS 自适应，固定高度竖向滚动，横向滚动条固定在屏幕底部。
     editable_cols：允许编辑的列名列表，其余列只读（黄色背景区分）。
-    返回编辑后的 DataFrame（不含底部幽灵行）。
+    返回编辑后的 DataFrame。
     """
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(editable=False, resizable=True,
