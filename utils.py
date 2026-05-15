@@ -70,12 +70,24 @@ function(params) {
 }
 """)
 
+_ROW_H        = 29   # AG Grid 默认行高
+_HEADER_H     = 49   # 列头高度
+_HSCROLL_BUF  = 20   # 留给水平滚动条的额外空间，避免被裁剪
+_MAX_CONTENT  = 450  # 超过此高度启用竖向滚动条
+
+
+def _calc_height(df: pd.DataFrame) -> int:
+    """行数少时完整展示；行数多时固定高度 + 竖向滚动。始终留出水平滚动条空间。"""
+    content_h = _HEADER_H + len(df) * _ROW_H
+    return min(content_h, _MAX_CONTENT) + _HSCROLL_BUF
+
+
 _GRID_BASE = dict(
     enableSorting=True,
     enableFilter=True,
     alwaysShowHorizontalScroll=True,
     suppressHorizontalScroll=False,
-    domLayout="autoHeight",   # 让 AG Grid 自动撑高，不再手动计算行数
+    # domLayout 保持默认 "normal"，固定高度 + 竖向滚动
 )
 
 
@@ -88,12 +100,11 @@ def _build_go(gb: GridOptionsBuilder) -> dict:
 
 
 def show_table(df: pd.DataFrame, height: int = None, key: str = None) -> None:
-    """只读表格：列菜单中文，高度自动，始终显示横向滚动条，列宽 80~100px。"""
+    """只读表格：列菜单中文，竖向滚动，横向滚动条始终可见，列宽 80~100px。"""
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(resizable=True, sortable=True, filter=True)
     go = _build_go(gb)
-    # height=0 时 streamlit-aggrid 会采用 domLayout=autoHeight 的实际高度
-    AgGrid(df, gridOptions=go, height=height or 0,
+    AgGrid(df, gridOptions=go, height=height or _calc_height(df),
            use_container_width=True, fit_columns_on_grid_load=False,
            allow_unsafe_jscode=True, key=key)
 
@@ -101,7 +112,7 @@ def show_table(df: pd.DataFrame, height: int = None, key: str = None) -> None:
 def editable_table(df: pd.DataFrame, editable_cols: list[str],
                    height: int = None, key: str = None) -> pd.DataFrame:
     """
-    可编辑表格：列菜单中文，高度自动，始终显示横向滚动条，列宽 80~100px。
+    可编辑表格：列菜单中文，竖向滚动，横向滚动条始终可见，列宽 80~100px。
     editable_cols：允许编辑的列名列表，其余列只读（黄色背景区分）。
     返回编辑后的 DataFrame。
     """
@@ -115,7 +126,7 @@ def editable_table(df: pd.DataFrame, editable_cols: list[str],
     go = _build_go(gb)
     result = AgGrid(df, gridOptions=go,
                     update_mode=GridUpdateMode.VALUE_CHANGED,
-                    height=height or 0,
+                    height=height or _calc_height(df),
                     use_container_width=True, fit_columns_on_grid_load=False,
                     allow_unsafe_jscode=True, key=key)
     return pd.DataFrame(result["data"])
