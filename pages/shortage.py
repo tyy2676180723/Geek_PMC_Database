@@ -53,7 +53,7 @@ with st.expander("筛选条件", expanded=True):
         if sel_asm:
             mask = pd.Series(False, index=df_view.index)
             for c in sel_asm:
-                mask |= (df_view[c].notna() & (df_view[c] != 0))
+                mask |= (pd.to_numeric(df_view[c], errors="coerce").fillna(0) > 0)
             df_view = df_view[mask]
 
     st.markdown("---")
