@@ -55,18 +55,36 @@ LOCALE_ZH = {
 
 _DEFAULT_H = 540
 
-# FIT_CONTENTS 完成后（1000ms），把仍然过窄的列补到 80px
-# 横向滚动条 position:fixed 固定在屏幕底部
+# 用 IntersectionObserver 监听 grid 真正可见后再自适应列宽
+# 等价于手动点击列菜单的"所有列自适应"，但自动触发
 _ON_READY_JS = JsCode("""
 function(params) {
-    // FIT_CONTENTS 自适应完成后补下限
-    setTimeout(function() {
-        var MIN_W = 80;
-        params.columnApi.getAllColumns().forEach(function(col) {
-            if (col.getActualWidth() < MIN_W)
-                params.columnApi.setColumnWidth(col.getColId(), MIN_W);
-        });
-    }, 1000);
+    var grid = document.querySelector('.ag-root-wrapper');
+
+    function autoSizeAndSync() {
+        params.columnApi.autoSizeAllColumns();
+        var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
+        var viewport = document.querySelector('.ag-body-viewport');
+        if (hScroll && viewport) {
+            var r = viewport.getBoundingClientRect();
+            hScroll.style.left  = r.left  + 'px';
+            hScroll.style.width = r.width + 'px';
+        }
+    }
+
+    if (grid && 'IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    setTimeout(autoSizeAndSync, 100);
+                    observer.disconnect();
+                }
+            });
+        }, { threshold: 0.1 });
+        observer.observe(grid);
+    } else {
+        setTimeout(autoSizeAndSync, 600);
+    }
 
     // 横向滚动条固定到屏幕底部
     var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
