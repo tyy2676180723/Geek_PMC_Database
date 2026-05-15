@@ -106,7 +106,21 @@ function(params) {
     window.addEventListener('resize', syncPos);
     window.addEventListener('scroll', syncPos);
 
-    viewport.style.paddingBottom = (hScroll.offsetHeight || 20) + 'px';
+    // 用注入 <style> + !important 防止 AG Grid 内部样式覆盖 paddingBottom
+    function applyPaddingFix() {
+        var h = hScroll.offsetHeight;
+        if (!h || h < 5) h = 20;
+        var st = document.getElementById('__ag_pb_fix__');
+        if (!st) {
+            st = document.createElement('style');
+            st.id = '__ag_pb_fix__';
+            document.head.appendChild(st);
+        }
+        st.textContent = '.ag-body-viewport { padding-bottom: ' + h + 'px !important; }';
+    }
+    applyPaddingFix();
+    // 延迟再执行一次，确保 offsetHeight 在完整渲染后准确
+    setTimeout(applyPaddingFix, 300);
 }
 """)
 
