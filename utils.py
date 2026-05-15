@@ -53,7 +53,7 @@ LOCALE_ZH = {
     "previous": "上一页",
 }
 
-_DEFAULT_H = 500   # 固定高度，保留竖向滚动条
+_DEFAULT_H = 540   # 固定高度，比500多40px，保证末行不被遮挡
 
 # 列宽钳制 + 横向滚动条 position:fixed 固定在屏幕底部
 # scroll / resize 时重新同步宽度和位置
@@ -87,6 +87,9 @@ function(params) {
     syncPos();
     window.addEventListener('resize', syncPos);
     window.addEventListener('scroll', syncPos);
+
+    // 给 rows 区域底部留出空间，防止悬浮滚动条遮挡最后一行
+    viewport.style.paddingBottom = (hScroll.offsetHeight || 20) + 'px';
 }
 """)
 
