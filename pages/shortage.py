@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from utils import show_table, editable_table
 
 st.title("待开工单缺料看板")
 
@@ -85,32 +86,19 @@ CORE_COLS = ["序号", "子项物料编码", "子项物料名称", "子项物料
              "交期", "供应商", "采购"]
 core_cols_exist = [c for c in CORE_COLS if c in df_view.columns]
 
-# 所有列默认禁用，只开放「交期」编辑
-column_config = {
-    col: st.column_config.Column(disabled=True)
-    for col in core_cols_exist if col != "交期"
-}
-if "交期" in core_cols_exist:
-    column_config["交期"] = st.column_config.TextColumn("交期", help="可直接编辑")
-
 tab1, tab2 = st.tabs(["核心字段", "完整数据（含工单分解）"])
 
 with tab1:
-    edited_df = st.data_editor(
-        df_view[core_cols_exist],
-        column_config=column_config,
-        use_container_width=True,
-        height=500,
-        key="editor_core",
+    edited_df = editable_table(
+        df_view[core_cols_exist], ["交期"],
+        height=500, key="editor_core"
     )
 
     if st.button("💾 保存交期修改", type="primary"):
         if "交期" in edited_df.columns and "交期" in df.columns:
-            # 将编辑结果按行索引写回原始完整 df
             df.loc[df_view.index, "交期"] = edited_df["交期"].values
         try:
             df.to_excel(data_path, index=False)
-            # 推送到 GitHub
             result = subprocess.run(
                 ["git", "add", "待开工缺料详情.xlsx"],
                 cwd=str(BASE), capture_output=True
@@ -133,20 +121,9 @@ with tab1:
             st.error(f"保存失败：{e}")
 
 with tab2:
-    # 所有列禁用，只开放「交期」编辑
-    col_config_full = {
-        col: st.column_config.Column(disabled=True)
-        for col in df_view.columns if col != "交期"
-    }
-    if "交期" in df_view.columns:
-        col_config_full["交期"] = st.column_config.TextColumn("交期", help="可直接编辑")
-
-    edited_full = st.data_editor(
-        df_view,
-        column_config=col_config_full,
-        use_container_width=True,
-        height=500,
-        key="editor_full",
+    edited_full = editable_table(
+        df_view, ["交期"],
+        height=500, key="editor_full"
     )
 
     if st.button("💾 保存交期修改", type="primary", key="save_full"):
@@ -154,10 +131,8 @@ with tab2:
             df.loc[df_view.index, "交期"] = edited_full["交期"].values
         try:
             df.to_excel(data_path, index=False)
-            diff = subprocess.run(
-                ["git", "add", "待开工缺料详情.xlsx"],
-                cwd=str(BASE), capture_output=True
-            )
+            subprocess.run(["git", "add", "待开工缺料详情.xlsx"],
+                           cwd=str(BASE), capture_output=True)
             result = subprocess.run(
                 ["git", "diff", "--cached", "--quiet"],
                 cwd=str(BASE), capture_output=True
