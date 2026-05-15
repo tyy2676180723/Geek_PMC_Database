@@ -93,6 +93,7 @@ def shortage_editor(df_raw: pd.DataFrame, sheet_name: str, prog: dict, editor_ke
     gb.configure_default_column(editable=False, resizable=True, sortable=True, filter=True)
     gb.configure_column("处理进度", editable=True,
                         cellStyle={"backgroundColor": "#fffde7"})
+    gb.configure_grid_options(enableSorting=True, enableFilter=True)
     go = gb.build()
     go["localeText"] = LOCALE_ZH
 
