@@ -56,12 +56,11 @@ LOCALE_ZH = {
 _DEFAULT_H = 540
 
 # 用 IntersectionObserver 监听 grid 真正可见后再自适应列宽
-# 等价于手动点击列菜单的"所有列自适应"，但自动触发
 _ON_READY_JS = JsCode("""
 function(params) {
     var grid = document.querySelector('.ag-root-wrapper');
 
-    // Inject CSS: keep scrollbar in flex layout (17px) and make it always visible
+    // Force horizontal scrollbar to always be visible with custom webkit styling
     var st = document.getElementById('__ag_fix__');
     if (!st) {
         st = document.createElement('style');
@@ -69,21 +68,14 @@ function(params) {
         document.head.appendChild(st);
     }
     st.textContent = [
-        '.ag-body-horizontal-scroll { display: block !important; min-height: 17px !important; }',
-        '.ag-body-horizontal-scroll-viewport { min-height: 17px !important; overflow-x: scroll !important; }',
+        '.ag-body-horizontal-scroll-viewport { overflow-x: scroll !important; }',
         '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar { height: 8px !important; display: block !important; }',
         '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-track { background: #e0e0e0 !important; }',
         '.ag-body-horizontal-scroll-viewport::-webkit-scrollbar-thumb { background: #999 !important; border-radius: 4px !important; min-width: 30px !important; }'
     ].join(' ');
 
-    // After injecting CSS, dispatch resize so AG Grid recalculates viewportHeight
-    // and maxScrollY — without this the last row is unreachable by mouse scroll.
-    setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 50);
-
     function autoSize() {
         params.columnApi.autoSizeAllColumns();
-        // Recalculate again after columns are resized
-        setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 80);
     }
 
     if (grid && 'IntersectionObserver' in window) {
@@ -99,6 +91,15 @@ function(params) {
     } else {
         setTimeout(autoSize, 600);
     }
+}
+""")
+
+# 5px 幽灵钉住行：不参与排序/筛选，只作为底部缓冲，
+# 确保最后一行数据可以完整滚动到可视区域（绕开 AG Grid maxScrollY 计算偏差）
+_PINNED_ROW_HEIGHT_JS = JsCode("""
+function(params) {
+    if (params.node.rowPinned === 'bottom') return 5;
+    return null;
 }
 """)
 
@@ -118,11 +119,13 @@ def _build_go(gb: GridOptionsBuilder) -> dict:
     go = gb.build()
     go["localeText"] = LOCALE_ZH
     go["onFirstDataRendered"] = _ON_READY_JS
+    go["pinnedBottomRowData"] = [{}]
+    go["getRowHeight"] = _PINNED_ROW_HEIGHT_JS
     return go
 
 
 def show_table(df: pd.DataFrame, height: int = None, key: str = None) -> None:
-    """只读表格：列菜单中文，FIT_CONTENTS 自适应，固定高度竖向滚动，横向滚动条固定在屏幕底部。"""
+    """只读表格：列菜单中文，FIT_CONTENTS 自适应，固定高度竖向滚动，横向滚动条始终可见。"""
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(resizable=True, sortable=True, filter=True)
     go = _build_go(gb)
@@ -135,9 +138,9 @@ def show_table(df: pd.DataFrame, height: int = None, key: str = None) -> None:
 def editable_table(df: pd.DataFrame, editable_cols: list[str],
                    height: int = None, key: str = None) -> pd.DataFrame:
     """
-    可编辑表格：列菜单中文，FIT_CONTENTS 自适应，固定高度竖向滚动，横向滚动条固定在屏幕底部。
+    可编辑表格：列菜单中文，FIT_CONTENTS 自适应，固定高度竖向滚动，横向滚动条始终可见。
     editable_cols：允许编辑的列名列表，其余列只读（黄色背景区分）。
-    返回编辑后的 DataFrame。
+    返回编辑后的 DataFrame（不含底部幽灵行）。
     """
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(editable=False, resizable=True,
