@@ -55,26 +55,26 @@ LOCALE_ZH = {
 
 
 def show_table(df: pd.DataFrame, height: int = 400, key: str = None) -> None:
-    """只读表格，列菜单中文。"""
+    """只读表格，列菜单中文，支持横向滚动。"""
     gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_default_column(resizable=True, sortable=True, filter=True)
+    gb.configure_default_column(resizable=True, sortable=True, filter=True, minWidth=100)
     gb.configure_grid_options(enableSorting=True, enableFilter=True)
     go = gb.build()
     go["localeText"] = LOCALE_ZH
     AgGrid(df, gridOptions=go, height=height,
-           use_container_width=True, key=key)
+           use_container_width=True, fit_columns_on_grid_load=False, key=key)
 
 
 def editable_table(df: pd.DataFrame, editable_cols: list[str],
                    height: int = 400, key: str = None) -> pd.DataFrame:
     """
-    可编辑表格，列菜单中文。
+    可编辑表格，列菜单中文，支持横向滚动。
     editable_cols：允许编辑的列名列表，其余列只读。
     返回编辑后的 DataFrame。
     """
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(editable=False, resizable=True,
-                                sortable=True, filter=True)
+                                sortable=True, filter=True, minWidth=100)
     gb.configure_grid_options(enableSorting=True, enableFilter=True)
     for col in editable_cols:
         if col in df.columns:
@@ -84,5 +84,6 @@ def editable_table(df: pd.DataFrame, editable_cols: list[str],
     go["localeText"] = LOCALE_ZH
     result = AgGrid(df, gridOptions=go,
                     update_mode=GridUpdateMode.VALUE_CHANGED,
-                    height=height, use_container_width=True, key=key)
+                    height=height, use_container_width=True,
+                    fit_columns_on_grid_load=False, key=key)
     return pd.DataFrame(result["data"])
