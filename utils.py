@@ -46,42 +46,36 @@ LOCALE_ZH = {
     "page": "页",
     "of": "/",
     "to": "-",
-    "更多": "更多",
+    "more": "更多",
     "next": "下一页",
     "last": "末页",
     "first": "首页",
     "previous": "上一页",
 }
 
-# 首次渲染后：自适应列宽，超过 100px 的列压回 100px；不设 maxWidth，手动拖拽不受限
+# 首次渲染：先自适应列宽，再把超 100px 的列压回 100px；不设 maxWidth，手动拖拽不受限
+# minWidth=80 保证内容极短的列也不会被压到难以辨认
 _CAP_COLUMNS_JS = JsCode("""
 function(params) {
+    var MIN_W = 80, MAX_W = 100;
     params.columnApi.autoSizeAllColumns();
     params.columnApi.getAllColumns().forEach(function(col) {
-        if (col.getActualWidth() > 100) {
-            params.columnApi.setColumnWidth(col.getColId(), 100);
+        var w = col.getActualWidth();
+        if (w < MIN_W) {
+            params.columnApi.setColumnWidth(col.getColId(), MIN_W);
+        } else if (w > MAX_W) {
+            params.columnApi.setColumnWidth(col.getColId(), MAX_W);
         }
     });
 }
 """)
-
-_ROW_H    = 29   # AG Grid 默认行高
-_HEADER_H = 49   # 列头高度
-_HSCROLL  = 20   # 水平滚动条高度
-_MARGIN   = 6    # 安全余量
-_MAX_H    = 600  # 最大高度上限
-
-
-def _calc_height(df: pd.DataFrame) -> int:
-    """按行数动态计算 iframe 高度，确保滚动条不被裁掉。"""
-    return min(_HEADER_H + len(df) * _ROW_H + _HSCROLL + _MARGIN, _MAX_H)
-
 
 _GRID_BASE = dict(
     enableSorting=True,
     enableFilter=True,
     alwaysShowHorizontalScroll=True,
     suppressHorizontalScroll=False,
+    domLayout="autoHeight",   # 让 AG Grid 自动撑高，不再手动计算行数
 )
 
 
@@ -94,11 +88,12 @@ def _build_go(gb: GridOptionsBuilder) -> dict:
 
 
 def show_table(df: pd.DataFrame, height: int = None, key: str = None) -> None:
-    """只读表格：列菜单中文，始终显示横向滚动条，列宽自适应且上限 100px。"""
+    """只读表格：列菜单中文，高度自动，始终显示横向滚动条，列宽 80~100px。"""
     gb = GridOptionsBuilder.from_dataframe(df)
     gb.configure_default_column(resizable=True, sortable=True, filter=True)
     go = _build_go(gb)
-    AgGrid(df, gridOptions=go, height=height or _calc_height(df),
+    # height=0 时 streamlit-aggrid 会采用 domLayout=autoHeight 的实际高度
+    AgGrid(df, gridOptions=go, height=height or 0,
            use_container_width=True, fit_columns_on_grid_load=False,
            allow_unsafe_jscode=True, key=key)
 
@@ -106,8 +101,8 @@ def show_table(df: pd.DataFrame, height: int = None, key: str = None) -> None:
 def editable_table(df: pd.DataFrame, editable_cols: list[str],
                    height: int = None, key: str = None) -> pd.DataFrame:
     """
-    可编辑表格：列菜单中文，始终显示横向滚动条，列宽自适应且上限 100px。
-    editable_cols：允许编辑的列名列表，其余列只读。
+    可编辑表格：列菜单中文，高度自动，始终显示横向滚动条，列宽 80~100px。
+    editable_cols：允许编辑的列名列表，其余列只读（黄色背景区分）。
     返回编辑后的 DataFrame。
     """
     gb = GridOptionsBuilder.from_dataframe(df)
@@ -120,7 +115,7 @@ def editable_table(df: pd.DataFrame, editable_cols: list[str],
     go = _build_go(gb)
     result = AgGrid(df, gridOptions=go,
                     update_mode=GridUpdateMode.VALUE_CHANGED,
-                    height=height or _calc_height(df),
+                    height=height or 0,
                     use_container_width=True, fit_columns_on_grid_load=False,
                     allow_unsafe_jscode=True, key=key)
     return pd.DataFrame(result["data"])
