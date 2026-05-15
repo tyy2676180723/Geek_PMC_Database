@@ -2,7 +2,7 @@
 共享工具模块：AgGrid 中文表格
 新建看板时 import 本模块，调用 show_table / editable_table 即可。
 """
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode, ColumnsAutoSizeMode
 import pandas as pd
 
 LOCALE_ZH = {
@@ -53,22 +53,21 @@ LOCALE_ZH = {
     "previous": "上一页",
 }
 
-_DEFAULT_H = 540   # 固定高度，比500多40px，保证末行不被遮挡
+_DEFAULT_H = 540   # 固定高度，保留竖向滚动条且末行不被遮挡
 
-# 列宽钳制 + 横向滚动条 position:fixed 固定在屏幕底部
-# scroll / resize 时重新同步宽度和位置
+# FIT_CONTENTS 自适应完成后（约 800ms），把超过 200px 的列压回 200px
+# 不设下限，让短内容列保持自适应宽度
+# 横向滚动条 position:fixed 固定在屏幕底部，scroll/resize 时同步位置
 _ON_READY_JS = JsCode("""
 function(params) {
-    // ── 列宽：自适应后夹在 [80, 200] px；手动拖拽不受限 ────────
-    params.columnApi.autoSizeAllColumns();
+    // ── 列宽上限：等 FIT_CONTENTS 自适应完成后再压 200px ─────────
     setTimeout(function() {
-        var MIN_W = 80, MAX_W = 200;
+        var MAX_W = 200;
         params.columnApi.getAllColumns().forEach(function(col) {
-            var w = col.getActualWidth();
-            if      (w < MIN_W) params.columnApi.setColumnWidth(col.getColId(), MIN_W);
-            else if (w > MAX_W) params.columnApi.setColumnWidth(col.getColId(), MAX_W);
+            if (col.getActualWidth() > MAX_W)
+                params.columnApi.setColumnWidth(col.getColId(), MAX_W);
         });
-    }, 300);
+    }, 800);
 
     // ── 横向滚动条固定到屏幕底部 ──────────────────────────────
     var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
@@ -90,7 +89,7 @@ function(params) {
     window.addEventListener('resize', syncPos);
     window.addEventListener('scroll', syncPos);
 
-    // 给 rows 区域底部留出空间，防止悬浮滚动条遮挡最后一行
+    // rows 区底部留空，防止悬浮滚动条遮挡最后一行
     viewport.style.paddingBottom = (hScroll.offsetHeight || 20) + 'px';
 }
 """)
@@ -100,7 +99,7 @@ _GRID_BASE = dict(
     enableFilter=True,
     alwaysShowHorizontalScroll=True,
     suppressHorizontalScroll=False,
-    domLayout="normal",   # 固定高度 + 竖向滚动条
+    domLayout="normal",
 )
 
 
@@ -118,7 +117,8 @@ def show_table(df: pd.DataFrame, height: int = None, key: str = None) -> None:
     gb.configure_default_column(resizable=True, sortable=True, filter=True)
     go = _build_go(gb)
     AgGrid(df, gridOptions=go, height=height or _DEFAULT_H,
-           use_container_width=True, fit_columns_on_grid_load=False,
+           use_container_width=True,
+           columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
            allow_unsafe_jscode=True, key=key)
 
 
@@ -140,6 +140,7 @@ def editable_table(df: pd.DataFrame, editable_cols: list[str],
     result = AgGrid(df, gridOptions=go,
                     update_mode=GridUpdateMode.VALUE_CHANGED,
                     height=height or _DEFAULT_H,
-                    use_container_width=True, fit_columns_on_grid_load=False,
+                    use_container_width=True,
+                    columns_auto_size_mode=ColumnsAutoSizeMode.FIT_CONTENTS,
                     allow_unsafe_jscode=True, key=key)
     return pd.DataFrame(result["data"])
