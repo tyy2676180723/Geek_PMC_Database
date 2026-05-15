@@ -116,6 +116,7 @@ _GRID_BASE = dict(
     alwaysShowHorizontalScroll=True,
     suppressHorizontalScroll=False,
     domLayout="normal",
+    stopEditingWhenCellsLoseFocus=True,
 )
 
 
