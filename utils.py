@@ -70,16 +70,15 @@ function(params) {
 }
 """)
 
-_ROW_H        = 29   # AG Grid 默认行高
-_HEADER_H     = 49   # 列头高度
-_HSCROLL_BUF  = 20   # 留给水平滚动条的额外空间，避免被裁剪
-_MAX_CONTENT  = 450  # 超过此高度启用竖向滚动条
+_ROW_H       = 40   # gridOptions 里显式设定的行高，计算和渲染保持一致
+_HEADER_H    = 48   # 同上，显式设定的列头高度
+_H_SCROLL    = 20   # 水平滚动条高度
+_FRAME_PAD   = 10   # iframe 自身的边距 buffer
+_MAX_H       = 520  # 最大 iframe 高度（超出后竖向滚动）
 
 
 def _calc_height(df: pd.DataFrame) -> int:
-    """行数少时完整展示；行数多时固定高度 + 竖向滚动。始终留出水平滚动条空间。"""
-    content_h = _HEADER_H + len(df) * _ROW_H
-    return min(content_h, _MAX_CONTENT) + _HSCROLL_BUF
+    return min(_HEADER_H + len(df) * _ROW_H + _H_SCROLL + _FRAME_PAD, _MAX_H)
 
 
 _GRID_BASE = dict(
@@ -87,7 +86,8 @@ _GRID_BASE = dict(
     enableFilter=True,
     alwaysShowHorizontalScroll=True,
     suppressHorizontalScroll=False,
-    # domLayout 保持默认 "normal"，固定高度 + 竖向滚动
+    rowHeight=_ROW_H,       # 显式行高，与计算公式匹配
+    headerHeight=_HEADER_H, # 显式列头高度，与计算公式匹配
 )
 
 
