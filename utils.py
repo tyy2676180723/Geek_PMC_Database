@@ -55,21 +55,9 @@ LOCALE_ZH = {
 
 _DEFAULT_H = 540   # 固定高度，保留竖向滚动条且末行不被遮挡
 
-# FIT_CONTENTS 自适应完成后（约 800ms），把超过 200px 的列压回 200px
-# 不设下限，让短内容列保持自适应宽度
 # 横向滚动条 position:fixed 固定在屏幕底部，scroll/resize 时同步位置
 _ON_READY_JS = JsCode("""
 function(params) {
-    // ── 列宽上限：等 FIT_CONTENTS 自适应完成后再压 200px ─────────
-    setTimeout(function() {
-        var MAX_W = 200;
-        params.columnApi.getAllColumns().forEach(function(col) {
-            if (col.getActualWidth() > MAX_W)
-                params.columnApi.setColumnWidth(col.getColId(), MAX_W);
-        });
-    }, 800);
-
-    // ── 横向滚动条固定到屏幕底部 ──────────────────────────────
     var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
     var viewport = document.querySelector('.ag-body-viewport');
     if (!hScroll || !viewport) return;
