@@ -133,6 +133,15 @@ function(params) {
 }
 """)
 
+# 幽灵行完全透明且不可交互，仅作占位
+_PINNED_ROW_STYLE_JS = JsCode("""
+function(params) {
+    if (params.node.rowPinned === 'bottom') {
+        return { opacity: '0', pointerEvents: 'none', border: 'none' };
+    }
+}
+""")
+
 _GRID_BASE = dict(
     enableSorting=True,
     enableFilter=True,
@@ -151,6 +160,7 @@ def _build_go(gb: GridOptionsBuilder) -> dict:
     go["onFirstDataRendered"] = _ON_READY_JS
     go["pinnedBottomRowData"] = [{}]
     go["getRowHeight"] = _PINNED_ROW_HEIGHT_JS
+    go["getRowStyle"] = _PINNED_ROW_STYLE_JS
     return go
 
 
