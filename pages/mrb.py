@@ -11,24 +11,64 @@ st.title("MRB 看板")
 
 BASE = Path(__file__).parent.parent
 PROGRESS_FILE = BASE / "mrb_progress.json"
+REPO_SLUG = "tyy2676180723/Geek_PMC_Database"
+PROGRESS_GH_PATH = "PMC数据看板/mrb_progress.json"
+
+
+def _gh_repo():
+    """返回 GitHub Repo 对象（需要 GITHUB_TOKEN secret），否则 None。"""
+    try:
+        token = st.secrets.get("GITHUB_TOKEN")
+        if not token:
+            return None
+        from github import Github
+        return Github(token).get_repo(REPO_SLUG)
+    except Exception:
+        return None
 
 
 def load_progress() -> dict:
+    # 优先从 GitHub 读取（容器重启后数据仍在）
+    repo = _gh_repo()
+    if repo:
+        try:
+            f = repo.get_contents(PROGRESS_GH_PATH)
+            return json.loads(f.decoded_content.decode("utf-8"))
+        except Exception:
+            pass
+    # 回退到本地文件
     if PROGRESS_FILE.exists():
         return json.loads(PROGRESS_FILE.read_text(encoding="utf-8"))
     return {"工单缺料": {}, "待开工缺料": {}}
 
 
-def save_progress(prog: dict):
-    PROGRESS_FILE.write_text(
-        json.dumps(prog, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+def save_progress(prog: dict) -> bool:
+    content = json.dumps(prog, ensure_ascii=False, indent=2)
+    PROGRESS_FILE.write_text(content, encoding="utf-8")
+    today = date.today().strftime("%Y-%m-%d")
+    msg = f"MRB处理进度更新 {today}"
+
+    # 优先用 GitHub API（Streamlit Cloud 无 git 凭证时也能用）
+    repo = _gh_repo()
+    if repo:
+        try:
+            try:
+                f = repo.get_contents(PROGRESS_GH_PATH)
+                repo.update_file(PROGRESS_GH_PATH, msg, content, f.sha)
+            except Exception:
+                repo.create_file(PROGRESS_GH_PATH, msg, content)
+            return True
+        except Exception:
+            pass
+
+    # 回退到 git CLI（本地运行时有效）
     subprocess.run(["git", "add", "mrb_progress.json"], cwd=str(BASE), capture_output=True)
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=str(BASE), capture_output=True)
     if diff.returncode != 0:
-        today = date.today().strftime("%Y-%m-%d")
-        subprocess.run(["git", "commit", "-m", f"MRB处理进度更新 {today}"], cwd=str(BASE), capture_output=True)
-        subprocess.run(["git", "push"], cwd=str(BASE), capture_output=True)
+        subprocess.run(["git", "commit", "-m", msg], cwd=str(BASE), capture_output=True)
+        r = subprocess.run(["git", "push"], cwd=str(BASE), capture_output=True)
+        return r.returncode == 0
+    return True
 
 
 def merge_progress(df: pd.DataFrame, sheet_name: str, prog: dict):
@@ -78,8 +118,10 @@ with tab3:
             edited_a = editable_table(df_a, ["处理进度"], key="shortage_a")
             if st.button("💾 保存处理进度", key="save_a", type="primary"):
                 prog[sname] = dict(zip(edited_a[key_a].astype(str), edited_a["处理进度"]))
-                save_progress(prog)
-                st.success("已保存并推送")
+                if save_progress(prog):
+                    st.success("已保存并推送到 GitHub")
+                else:
+                    st.warning("已本地保存，但推送失败。请在 Streamlit Cloud Secrets 中添加 GITHUB_TOKEN。")
 
         with sub_b:
             sname2 = xls2.sheet_names[1]
@@ -88,7 +130,9 @@ with tab3:
             edited_b = editable_table(df_b, ["处理进度"], key="shortage_b")
             if st.button("💾 保存处理进度", key="save_b", type="primary"):
                 prog[sname2] = dict(zip(edited_b[key_b].astype(str), edited_b["处理进度"]))
-                save_progress(prog)
-                st.success("已保存并推送")
+                if save_progress(prog):
+                    st.success("已保存并推送到 GitHub")
+                else:
+                    st.warning("已本地保存，但推送失败。请在 Streamlit Cloud Secrets 中添加 GITHUB_TOKEN。")
     else:
         st.warning("未找到 MRB缺料.xlsx")
