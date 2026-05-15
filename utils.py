@@ -61,66 +61,23 @@ _ON_READY_JS = JsCode("""
 function(params) {
     var grid = document.querySelector('.ag-root-wrapper');
 
-    function autoSizeAndSync() {
+    function autoSize() {
         params.columnApi.autoSizeAllColumns();
-        var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
-        var viewport = document.querySelector('.ag-body-viewport');
-        if (hScroll && viewport) {
-            var r = viewport.getBoundingClientRect();
-            hScroll.style.left  = r.left  + 'px';
-            hScroll.style.width = r.width + 'px';
-        }
     }
 
     if (grid && 'IntersectionObserver' in window) {
         var observer = new IntersectionObserver(function(entries) {
             entries.forEach(function(entry) {
                 if (entry.isIntersecting) {
-                    setTimeout(autoSizeAndSync, 100);
+                    setTimeout(autoSize, 100);
                     observer.disconnect();
                 }
             });
         }, { threshold: 0.1 });
         observer.observe(grid);
     } else {
-        setTimeout(autoSizeAndSync, 600);
+        setTimeout(autoSize, 600);
     }
-
-    // 横向滚动条固定到屏幕底部
-    var hScroll  = document.querySelector('.ag-body-horizontal-scroll');
-    var viewport = document.querySelector('.ag-body-viewport');
-    if (!hScroll || !viewport) return;
-
-    hScroll.style.position   = 'fixed';
-    hScroll.style.bottom     = '0px';
-    hScroll.style.zIndex     = '1000';
-    hScroll.style.background = '#f0f2f6';
-    hScroll.style.borderTop  = '1px solid #d0d0d0';
-
-    function syncPos() {
-        var r = viewport.getBoundingClientRect();
-        hScroll.style.left  = r.left  + 'px';
-        hScroll.style.width = r.width + 'px';
-    }
-    syncPos();
-    window.addEventListener('resize', syncPos);
-    window.addEventListener('scroll', syncPos);
-
-    // 用注入 <style> + !important 防止 AG Grid 内部样式覆盖 paddingBottom
-    function applyPaddingFix() {
-        var h = hScroll.offsetHeight;
-        if (!h || h < 5) h = 20;
-        var st = document.getElementById('__ag_pb_fix__');
-        if (!st) {
-            st = document.createElement('style');
-            st.id = '__ag_pb_fix__';
-            document.head.appendChild(st);
-        }
-        st.textContent = '.ag-body-viewport { padding-bottom: ' + h + 'px !important; }';
-    }
-    applyPaddingFix();
-    // 延迟再执行一次，确保 offsetHeight 在完整渲染后准确
-    setTimeout(applyPaddingFix, 300);
 }
 """)
 
