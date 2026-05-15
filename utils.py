@@ -61,6 +61,18 @@ _ON_READY_JS = JsCode("""
 function(params) {
     var grid = document.querySelector('.ag-root-wrapper');
 
+    // Force horizontal scrollbar to always occupy layout space so the flex row
+    // area is sized correctly and the last row is never hidden underneath it.
+    var st = document.getElementById('__ag_hscroll__');
+    if (!st) {
+        st = document.createElement('style');
+        st.id = '__ag_hscroll__';
+        document.head.appendChild(st);
+    }
+    st.textContent =
+        '.ag-body-horizontal-scroll { display: block !important; min-height: 17px !important; }' +
+        '.ag-body-horizontal-scroll-viewport { min-height: 17px !important; overflow-x: scroll !important; }';
+
     function autoSize() {
         params.columnApi.autoSizeAllColumns();
     }
