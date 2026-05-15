@@ -133,4 +133,44 @@ with tab1:
             st.error(f"保存失败：{e}")
 
 with tab2:
-    st.dataframe(df_view, use_container_width=True, height=500)
+    # 所有列禁用，只开放「交期」编辑
+    col_config_full = {
+        col: st.column_config.Column(disabled=True)
+        for col in df_view.columns if col != "交期"
+    }
+    if "交期" in df_view.columns:
+        col_config_full["交期"] = st.column_config.TextColumn("交期", help="可直接编辑")
+
+    edited_full = st.data_editor(
+        df_view,
+        column_config=col_config_full,
+        use_container_width=True,
+        height=500,
+        key="editor_full",
+    )
+
+    if st.button("💾 保存交期修改", type="primary", key="save_full"):
+        if "交期" in edited_full.columns and "交期" in df.columns:
+            df.loc[df_view.index, "交期"] = edited_full["交期"].values
+        try:
+            df.to_excel(data_path, index=False)
+            diff = subprocess.run(
+                ["git", "add", "待开工缺料详情.xlsx"],
+                cwd=str(BASE), capture_output=True
+            )
+            result = subprocess.run(
+                ["git", "diff", "--cached", "--quiet"],
+                cwd=str(BASE), capture_output=True
+            )
+            if result.returncode != 0:
+                today = date.today().strftime("%Y-%m-%d")
+                subprocess.run(
+                    ["git", "commit", "-m", f"交期更新 {today}"],
+                    cwd=str(BASE), capture_output=True
+                )
+                subprocess.run(["git", "push"], cwd=str(BASE), capture_output=True)
+                st.success("已保存并推送，刷新后生效")
+            else:
+                st.info("内容无变化，无需保存")
+        except Exception as e:
+            st.error(f"保存失败：{e}")
