@@ -1,7 +1,11 @@
 import re
-import streamlit as st
-import pandas as pd
+import subprocess
+import shutil
+from datetime import date
 from pathlib import Path
+
+import pandas as pd
+import streamlit as st
 
 st.title("待开工单缺料看板")
 
@@ -33,21 +37,17 @@ with m4:
 st.markdown("---")
 
 # ── 动态筛选 ──────────────────────────────────────────────────────────────────
-COLS_PER_ROW  = 4
-MULTISEL_MAX  = 50   # 唯一值超过此数改用关键字搜索
+COLS_PER_ROW = 4
+MULTISEL_MAX = 50
 
 with st.expander("筛选条件", expanded=True):
     df_view = df.copy()
 
-    # 1. 成品料号筛选（默认展示）
     if assembly_cols:
         st.markdown("**成品料号**")
         sel_asm = st.multiselect(
-            "成品料号",
-            options=assembly_cols,
-            default=[],
-            label_visibility="collapsed",
-            key="f_assembly"
+            "成品料号", options=assembly_cols, default=[],
+            label_visibility="collapsed", key="f_assembly"
         )
         if sel_asm:
             mask = pd.Series(False, index=df_view.index)
@@ -57,15 +57,14 @@ with st.expander("筛选条件", expanded=True):
 
     st.markdown("---")
 
-    # 2. 其余列：默认折叠
     with st.expander("更多筛选条件", expanded=False):
         for row_start in range(0, len(normal_cols), COLS_PER_ROW):
             row_cols = normal_cols[row_start: row_start + COLS_PER_ROW]
             ui_cols  = st.columns(len(row_cols))
             for ui_col, col in zip(ui_cols, row_cols):
                 with ui_col:
-                    series  = df[col].dropna()
-                    n_uniq  = series.nunique()
+                    series = df[col].dropna()
+                    n_uniq = series.nunique()
                     if n_uniq <= MULTISEL_MAX:
                         options = sorted(series.unique().tolist(), key=str)
                         sel = st.multiselect(col, options, default=options, key=f"f_{col}")
@@ -86,17 +85,52 @@ CORE_COLS = ["序号", "子项物料编码", "子项物料名称", "子项物料
              "交期", "供应商", "采购"]
 core_cols_exist = [c for c in CORE_COLS if c in df_view.columns]
 
+# 所有列默认禁用，只开放「交期」编辑
+column_config = {
+    col: st.column_config.Column(disabled=True)
+    for col in core_cols_exist if col != "交期"
+}
+if "交期" in core_cols_exist:
+    column_config["交期"] = st.column_config.TextColumn("交期", help="可直接编辑")
+
 tab1, tab2 = st.tabs(["核心字段", "完整数据（含工单分解）"])
 
 with tab1:
-    st.dataframe(
-        df_view[core_cols_exist].style.highlight_between(
-            subset=["最终缺料"] if "最终缺料" in core_cols_exist else [],
-            left=-9999, right=-0.01, color="#FFCCCC"
-        ),
+    edited_df = st.data_editor(
+        df_view[core_cols_exist],
+        column_config=column_config,
         use_container_width=True,
         height=500,
+        key="editor_core",
     )
+
+    if st.button("💾 保存交期修改", type="primary"):
+        if "交期" in edited_df.columns and "交期" in df.columns:
+            # 将编辑结果按行索引写回原始完整 df
+            df.loc[df_view.index, "交期"] = edited_df["交期"].values
+        try:
+            df.to_excel(data_path, index=False)
+            # 推送到 GitHub
+            result = subprocess.run(
+                ["git", "add", "待开工缺料详情.xlsx"],
+                cwd=str(BASE), capture_output=True
+            )
+            diff = subprocess.run(
+                ["git", "diff", "--cached", "--quiet"],
+                cwd=str(BASE), capture_output=True
+            )
+            if diff.returncode != 0:
+                today = date.today().strftime("%Y-%m-%d")
+                subprocess.run(
+                    ["git", "commit", "-m", f"交期更新 {today}"],
+                    cwd=str(BASE), capture_output=True
+                )
+                subprocess.run(["git", "push"], cwd=str(BASE), capture_output=True)
+                st.success("已保存并推送，刷新后生效")
+            else:
+                st.info("内容无变化，无需保存")
+        except Exception as e:
+            st.error(f"保存失败：{e}")
 
 with tab2:
     st.dataframe(df_view, use_container_width=True, height=500)
