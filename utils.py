@@ -117,7 +117,7 @@ function(params) {
 # 确保最后一行数据可以完整滚动到可视区域（绕开 AG Grid maxScrollY 计算偏差）
 _PINNED_ROW_HEIGHT_JS = JsCode("""
 function(params) {
-    if (params.node.rowPinned === 'bottom') return 10;
+    if (params.node.rowPinned === 'bottom') return 13;
     return null;
 }
 """)
